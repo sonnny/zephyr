@@ -1,0 +1,8 @@
+ / {
+    myLed: myLed{
+        compatible = "simple,leds";
+        gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
+        label = "Blue led";
+        delay = <20>;
+    };
+};
