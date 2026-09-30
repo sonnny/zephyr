@@ -1,0 +1,36 @@
+September 29, 2026  zephyr device driver tutorial notes
+reference -- https://embedded-house.ghost.io/10-your-first-driver-part-ii/
+
+files are commented to reflect the reference
+
+name of driver simple,leds
+use like -- compatible = "simple,leds";
+
+building -- west build -p -b maker_pi_rp2040 .  (notice the dot after rp2040)
+
+app folder
+
+--- CMakeLists.txt
+--- prj.conf
+
+--- src (folder)
+    --- main.c
+    
+--- boards (folder)
+    --- maker_pi_rp2040.overlay
+    
+--- drivers (folder)
+    --- simple_leds (folder)
+        --- CMakeLists.txt
+        --- Kconfig
+        --- simple_leds.c
+        --- simple_leds.h
+        --- zephyr (folder)
+            --- module.yaml
+            
+--- dts (folder)
+    --- bindings (folder)
+        --- simple,leds.yaml
+        
+--- west.yml
+        

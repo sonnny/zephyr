@@ -1,0 +1,18 @@
+app
+├── app.overlay
+├── CMakeLists.txt
+├── drivers
+│   └── simple_leds
+│       ├── CMakeLists.txt
+│       ├── Kconfig
+│       ├── simple_leds.c
+│       ├── simple_leds.h
+│       └── zephyr
+│           └── module.yaml
+├── dts
+│   └── bindings
+│       └── simple,leds.yaml
+├── prj.conf
+├── src
+│   └── main.c
+└── west.yml
