@@ -1,0 +1,9 @@
+# Create a new option in menuconfig
+# this module is not operational by default
+# CMakeLists.txt file is compiled only if Kconfig option is enabled
+config SIMPLE_MOTOR
+    bool "Basic led handling functions"
+    default n   # Set the library to be disabled by default
+    depends on GPIO && PWM  # Make it dependent on GPIOS and PWM
+    help
+        Adds init on, off and toggle fucntionalities for led support.
