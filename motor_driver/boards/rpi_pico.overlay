@@ -1,0 +1,39 @@
+ / {
+ 
+    motor: my_motor{
+        compatible = "simple,motor";
+        pwms = <&pwm 3 1000 PWM_POLARITY_NORMAL>;
+        gpios = <&gpio0 4 GPIO_ACTIVE_HIGH>, <&gpio0 5 GPIO_ACTIVE_HIGH>;
+        
+   
+
+        /*zephyr,deferred-init;*/
+ 
+  
+ 
+        
+  
+    };
+};
+
+/* Enable and configure the PWM controller node */
+
+&pwm {
+    status = "okay";
+    pinctrl-0 = <&pwm_ch1b_default>; /* Specific pin mux for RP2040 */
+    pinctrl-names = "default";
+};
+
+&pinctrl {
+    pwm_ch1b_default: pwm_ch1b_default {
+        group1 {
+            /* Pin 3 corresponds to GPIO3. Check your board's pinctrl file for exact syntax.
+               For RP2040, this is often referenced as PWM_1B_P3 or similar. */
+            pinmux = <PWM_1B_P3>; 
+        };
+    };
+};
+
+
+
+
