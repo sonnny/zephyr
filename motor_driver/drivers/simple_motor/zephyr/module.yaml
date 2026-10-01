@@ -1,0 +1,7 @@
+# the Kconfig line tells zephyr's build system that
+# this module provides configuration options defined in
+# a Kconfig file located in the module directory
+name: simple_motor
+build:
+  cmake: .
+  kconfig: Kconfig
