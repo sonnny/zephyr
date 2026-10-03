@@ -1,0 +1,7 @@
+# the Kconfig line tells zephyr's build system that
+# this module provides configuration options defined in
+# a Kconfig file located in the module directory
+name: recto_sn754410
+build:
+  cmake: .
+  kconfig: Kconfig
