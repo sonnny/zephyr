@@ -1,0 +1,6 @@
+config RECTO_SN754410
+  bool "basic  motor functions"
+  default n
+  depends on GPIO && PWM
+  help
+     demo how to use driver for sn754410 motor controller chip
