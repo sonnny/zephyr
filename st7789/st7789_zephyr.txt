@@ -1,0 +1,121 @@
+////////////////////////// main.c
+/*
+  build:
+     west build -p always -b rpi_pico .
+     
+  flash:
+     west flash -r uf2
+*/
+
+#include <zephyr/kernel.h>
+#include <zephyr/drivers/display.h>
+#include <lvgl.h>
+#include <lvgl_mem.h>
+#include <lvgl_zephyr.h>
+
+int main(void){
+  const struct device *display_dev;
+  display_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
+  lv_obj_t *hello_world_label = lv_label_create(lv_scr_act());
+  lv_label_set_text(hello_world_label, "Hello world!");
+  lv_obj_align(hello_world_label, LV_ALIGN_TOP_MID, 0, 0);
+  lv_task_handler();
+  display_blanking_off(display_dev);
+return 0;
+}
+////////////////////////// CMakeLists.txt
+cmake_minimum_required( VERSION 3.20.0 )
+find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+project(demo)
+target_sources(app PRIVATE src/main.c)
+////////////////////////// prj.conf
+CONFIG_GPIO=y
+CONFIG_SPI=y
+CONFIG_DISPLAY=y
+CONFIG_ST7789V=y
+
+# configure lvgl
+CONFIG_LVGL=y
+
+# size of the memory region from which lvgl memory is allocated
+CONFIG_LV_Z_MEM_POOL_SIZE=32768
+CONFIG_MAIN_STACK_SIZE=8192
+CONFIG_LV_Z_BITS_PER_PIXEL=16
+CONFIG_LV_COLOR_16_SWAP=y
+////////////////////////// rpi_pico.overlay
+/*
+ *  https://docs.zephyrproject.org/latest/boards/raspberrypi/rpi_pico/doc/index.html
+ 
+ ftf display module amazon link
+ https://www.amazon.com/Display-240X280-Interface-Controller-Arduino/dp/B0DQ4R95TZ/ref=sr_1_1?sr=8-1
+ 
+ default rpi_pico zephyr peripheral mapping
+ spi0 rx  - gpio 16 not used
+ spi0 csn - gpio 17
+ spi0 sck - gpio 18
+ spi0 tx  - gpio 19
+ 
+ added by overlay for st7789 display
+ gpio:
+   dc    - gpio 20
+   reset - gpio 21
+   
+   blk or led is tied high for the backlight
+
+*/
+
+#include <zephyr/dt-bindings/lvgl/lvgl.h>
+#include <zephyr/dt-bindings/display/panel.h>
+#include <zephyr/dt-bindings/mipi_dbi/mipi_dbi.h>
+
+/ {
+
+  chosen {
+    zephyr,display = &st7789;
+  };
+  
+  mipi_dbi {
+    compatible      = "zephyr,mipi-dbi-spi";
+    spi-dev         = <&spi0>;
+    dc-gpios        = <&gpio0 20 GPIO_ACTIVE_HIGH>;
+    reset-gpios     = <&gpio0 21 GPIO_ACTIVE_LOW>;
+    write-only;
+    #address-cells  = <1>;
+    #size-cells     = <0>;
+
+    st7789: st7789@0 {
+	compatible = "sitronix,st7789v";
+	reg = <0>;
+	mipi-max-frequency = <20000000>;
+	width = <280>;
+	height = <240>;
+	x-offset = <0>;
+	y-offset = <0>;
+	vcom = <0x19>;
+	gctrl = <0x35>;
+	vrhs = <0x12>;
+	vdvs = <0x20>;
+	mdac = <0x77>;
+	gamma = <0x00>;
+	pixel-format = <PANEL_PIXEL_FORMAT_RGB_565>;
+	lcm = <0x2c>;
+	porch-param = [0c 0c 00 33 33];
+	cmd2en-param = [5a 69 02 00];
+	pwctrl1-param = [a4 a1];
+	pvgam-param = [d0 04 0d 11 13 2b 3f 54 4c 18 0d 0b 1f 23];
+	nvgam-param = [d0 04 0c 11 13 2c 3f 44 51 2f 1f 1f 20 23];
+	ram-param = [00 f0];
+	rgb-param = [40 02 14];
+	mipi-mode = "MIPI_DBI_MODE_SPI_4WIRE";
+	status = "okay";
+    };
+  };
+};
+
+&spi0 {
+    pinctrl-0 = <&spi0_default>;
+    pinctrl-names = "default";
+    status          = "okay";
+    cs-gpios        = <&gpio0 17 GPIO_ACTIVE_LOW>;
+};
+
