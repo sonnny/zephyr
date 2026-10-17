@@ -1,0 +1,111 @@
+
+
+#include <zephyr/dt-bindings/lvgl/lvgl.h>
+#include <zephyr/dt-bindings/display/panel.h>
+#include <zephyr/dt-bindings/mipi_dbi/mipi_dbi.h>
+
+/ {
+
+  chosen {
+    zephyr,display = &st7789;
+  };
+  
+  aliases {
+    sw24 = &swgpio24;
+    sw22 = &swgpio22;
+    sw14 = &swgpio14;
+    sw12 = &swgpio12;
+    sw10 = &swgpio10;
+    
+    my-i2c1 = &i2c1;
+  };
+  
+  buttons {
+        compatible = "gpio-keys";
+        swgpio24: sw_24 {
+            gpios = <&gpio0 24 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+            label = "Button 0";
+        };
+        swgpio22: sw_22 {
+            gpios = <&gpio0 22 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+            label = "Button 0";
+        };
+        swgpio14: sw_14 {
+            gpios = <&gpio0 14 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+            label = "Button 0";
+        };
+        swgpio12: sw_12 {
+            gpios = <&gpio0 12 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+            label = "Button 0";
+        };
+        swgpio10: sw_10 {
+            gpios = <&gpio0 10 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+            label = "Button 0";
+        };
+  };
+  
+  mipi_dbi {
+    compatible      = "zephyr,mipi-dbi-spi";
+    spi-dev         = <&spi0>;
+    dc-gpios        = <&gpio0 20 GPIO_ACTIVE_HIGH>;
+    reset-gpios     = <&gpio0 21 GPIO_ACTIVE_LOW>;
+    write-only;
+    #address-cells  = <1>;
+    #size-cells     = <0>;
+
+    st7789: st7789@0 {
+	compatible = "sitronix,st7789v";
+	reg = <0>;
+	mipi-max-frequency = <20000000>;
+	width = <240>;
+	height = <240>;
+	x-offset = <0>;
+	y-offset = <0>;
+	vcom = <0x19>;
+	gctrl = <0x35>;
+	vrhs = <0x12>;
+	vdvs = <0x20>;
+	mdac = <0x77>;
+	gamma = <0x00>;
+	pixel-format = <PANEL_PIXEL_FORMAT_RGB_565>;
+	lcm = <0x2c>;
+	porch-param = [0c 0c 00 33 33];
+	cmd2en-param = [5a 69 02 00];
+	pwctrl1-param = [a4 a1];
+	pvgam-param = [d0 04 0d 11 13 2b 3f 54 4c 18 0d 0b 1f 23];
+	nvgam-param = [d0 04 0c 11 13 2c 3f 44 51 2f 1f 1f 20 23];
+	ram-param = [00 f0];
+	rgb-param = [40 02 14];
+	mipi-mode = "MIPI_DBI_MODE_SPI_4WIRE";
+	status = "okay";
+    };
+  };
+};
+
+&spi0 {
+    pinctrl-0 = <&spi0_default>;
+    pinctrl-names = "default";
+    status          = "okay";
+    cs-gpios        = <&gpio0 17 GPIO_ACTIVE_LOW>;
+};
+
+/* reassign i2c1 pins */
+&i2c1 {
+	clock-frequency = <I2C_BITRATE_STANDARD>;
+	pinctrl-0 = <&i2c1_custom>;
+	pinctrl-names = "default";
+	status = "okay";
+};
+
+&pinctrl {
+
+	i2c1_custom: i2c1_custom {
+		group1 {
+			pinmux = <I2C1_SDA_P26>, <I2C1_SCL_P27>;
+			input-enable;
+			input-schmitt-enable;
+		};
+	};
+};
+
+
