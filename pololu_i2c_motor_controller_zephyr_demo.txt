@@ -1,0 +1,55 @@
+/*
+ * pololu motoron i2c motor driver m2t550 
+ * zephyr example speaking to i2c
+ * demo to turn motor forward / reverse
+ * see user guide for init bytes
+ * 
+ */
+
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/i2c.h>
+
+const struct device *i2c_dev = DEVICE_DT_GET(DT_NODELABEL(i2c0));
+#define ADDRESS 0x10
+
+void init(){
+/* init sequence
+ * 0x96, 0x75             - reinitialize
+ * 0x8B, 0x04, 0x7B, 0x43 - disable CRC
+ * 0xA9, 0x00, 0x04       - clear reset flag
+ * https://www.pololu.com/docs/0J84/3.7
+ */
+uint8_t buf[9] = {0x96,0x74,0x8B,0x04,0x7B,0x43,0xA9,0x00,0x04};
+int ret;
+ret = i2c_write(i2c_dev, buf, sizeof(buf), ADDRESS);
+
+}
+
+void set_speed(int motor, int speed){
+/* set speed normal mode
+ * https://www.pololu.com/docs/0J84/9#cmd-set-speed
+ */
+uint8_t buf[4];
+int ret;
+buf[0] = 0xD1; /* set speed normal mode */
+buf[1] = motor & 0x7F;
+buf[2] = speed & 0x7f;
+buf[3] = (speed >> 7) & 0x7F;
+ret = i2c_write(i2c_dev, buf, sizeof(buf), ADDRESS);
+
+}
+
+int main(void){
+
+init();
+
+while(1){
+
+set_speed(1, 200);
+k_msleep(2000);
+
+set_speed(1, -200);
+k_msleep(2000);
+
+} return 0;}
