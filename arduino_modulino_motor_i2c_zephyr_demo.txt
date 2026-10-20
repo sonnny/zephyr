@@ -1,0 +1,42 @@
+/*
+ * arduino modulino motor i2c demo
+ * zephyr example speaking to i2c no driver
+ * just test clockwise / counter clockwise motor slowly
+ * https://github.com/arduino-libraries/Arduino_Modulino/blob/main/src/ModulinoMotors.h
+ */
+
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/i2c.h>
+
+const struct device *i2c_dev = DEVICE_DT_GET(DT_NODELABEL(i2c0));
+#define ADDRESS 0x24
+
+void set_speed(uint8_t speed){
+uint8_t buf[8];
+int ret;
+
+buf[0] = 0x53;  // speed command 'S'
+buf[1] = speed; // see link above for speed formula
+buf[2] = speed;
+buf[3] = 0x00;  // motor b
+buf[4] = 0x00;  // motor b
+buf[5] = 0x00;  // filler for 8 bytes
+buf[6] = 0x00;
+buf[7] = 0x00; 
+ret = i2c_write(i2c_dev, buf, sizeof(buf), ADDRESS);
+}
+
+int main(void){
+
+while(1){
+
+set_speed(0x12); // full speed is 0x7F
+                 // close to 0x00 is slower
+k_msleep(2000);
+
+set_speed(0xEA); // full speed other way is 0x80
+                 // close to 0xFF is slower
+k_msleep(2000);
+
+} return 0;}
