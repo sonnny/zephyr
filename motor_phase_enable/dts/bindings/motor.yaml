@@ -1,0 +1,12 @@
+description: motor controller phase enable
+compatible: "motor"
+properties:
+  gpios:
+    type: phandle-array
+    required: true
+    description: phase pin forward / reverse
+
+  pwms:
+    type: phandle-array
+    required: true
+    description: use for speed variation
