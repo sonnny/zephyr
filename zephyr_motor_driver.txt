@@ -1,0 +1,194 @@
+
+zephyr motor driver example
+  reference: https://github.com/0xAMF/Zephyr-RTOS-Notes/blob/main/notes/Zephyr%20-%20Writing%20Drivers.md
+using gpio for phase/direction/fwd/reverse
+using pwm for enable/speed pwm
+  board example: cytron md13s
+    https://www.cytron.io/p-13amp-6v-30v-dc-motor-driver
+
+  not a lot of error checking
+  this is more of a reference for writing zephyr driver
+  make sure to follow the directory hierarchy
+    i.e. src/main.c
+         drivers/motor/motor.c
+         
+  this file is a tutorial reference for me
+  I still don't understand fully the .yaml files
+    and the Kconfig files
+    
+  tested on a cytron md13s and works October 20, 2026
+
+////////// CMakeLists.txt //////////
+# Minimum CMake required version
+cmake_minimum_required( VERSION 3.20.0 )
+
+set(OPENOCD /usr/local/bin/openocd)
+set(OPENOCD_DEFAULT_PATH /home/sonny/pico/openocd)
+
+set(ZEPHYR_EXTRA_MODULES "${CMAKE_SOURCE_DIR}/drivers/motor")
+find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+
+# Project and source files
+project(demo)
+target_sources(app PRIVATE src/main.c)
+
+////////// prj.conf //////////
+CONFIG_NO_OPTIMIZATIONS=y
+CONFIG_GPIO=y
+CONFIG_PWM=y
+CONFIG_MOTOR=y
+
+////////// src/main.c //////////
+/*
+ * demo for zephyr motor driver
+ *   using phase and enable pins only
+ *   like: cytron md13s
+ *
+ * speed second argument is percentange 0 - 100
+ *   depending on the motor and battery you may have to
+ *   adjust the percentage before the motor start turning
+ *
+ * rotate takes a boolean for second argument
+ *   true to turn one way
+ *   false to turn the opposite way
+ *
+ * to stop the motor just send zero percent to motor speed
+ * see overlay file to see pin assignments
+ * tested on an rp2040
+ */
+
+#include <zephyr/kernel.h>
+#include "motor.h"
+
+const struct device *motor = DEVICE_DT_GET(DT_NODELABEL(mymotor)); 
+
+int main(void){
+  const struct motor_api *mtr_api = (const struct motor_api *)motor->api;
+  mtr_api->speed(motor, 60); // 60 lowest to turn on test motor
+  while(true){
+    mtr_api->rotate(motor, true); // clockwise
+    k_msleep(2000);
+    mtr_api->rotate(motor, false); // counter-clockwise
+    k_msleep(2000);} 
+ return 0;}
+
+////////// dts/bindings/motor.yaml //////////
+description: motor controller phase enable
+compatible: "motor"
+properties:
+  gpios:
+    type: phandle-array
+    required: true
+    description: phase pin forward / reverse
+
+  pwms:
+    type: phandle-array
+    required: true
+    description: use for speed variation
+
+////////// boards/rpi_pico.overlay //////////
+
+/ {
+  mymotor: mymotor{
+    compatible = "motor";
+    pwms = <&pwm 3 1000 PWM_POLARITY_NORMAL>;
+    gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
+  };
+};
+
+&pwm {
+  status = "okay";
+  pinctrl-0 = <&pwm_default>;
+  pinctrl-names = "default";
+};
+
+&pinctrl {
+  pwm_default: pwm_default {
+    group1 {
+      pinmux = <PWM_1B_P3>;
+    };
+  };
+};
+
+
+////////// drivers/motor/zephyr/module.yaml //////////
+# the Kconfig line tells zephyr's build system that
+# this module provides configuration options defined in
+# a Kconfig file located in the module directory
+name: motor
+build:
+  cmake: .
+  kconfig: Kconfig
+
+////////// drivers/motor/CMakeLists.txt //////////
+if(CONFIG_MOTOR)
+    zephyr_include_directories(.)
+    zephyr_library_sources(motor.c)
+endif()
+
+////////// drivers/motor/Kconfig //////////
+# Create a new option in menuconfig
+# this module is not operational by default
+# CMakeLists.txt file is compiled only if Kconfig option is enabled
+config MOTOR
+    bool "Basic led handling functions"
+    default y   # Set the library to be disabled by default
+    depends on GPIO && PWM  # Make it dependent on GPIOS and PWM
+    help
+        Adds init on, off and toggle fucntionalities for led support.
+
+////////// drivers/motor/motor.h //////////
+#ifndef __ZEPHYR_MOTOR_H__
+#define __ZEPHYR_MOTOR_H__
+
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/pwm.h>
+
+struct motor_api {
+    int (*rotate)(const struct device *dev, bool cw);          // boolean clockwise/counterclockwise
+    int (*speed)(const struct device *dev, uint8_t percent);}; // speed percent 0 - 100
+
+struct motor_config {
+    struct pwm_dt_spec  enable;   
+    struct gpio_dt_spec phase;
+    uint32_t id;};
+
+#endif
+
+////////// drivers/motor/motor.c //////////
+#define DT_DRV_COMPAT motor
+#include "motor.h"
+
+static int motor_rotation(const struct device *dev, bool cw ){
+  const struct motor_config *cfg = dev->config;
+  if (cw) { gpio_pin_set_dt(&cfg->phase, 0);} 
+  else { gpio_pin_set_dt(&cfg->phase, 1);}
+  return 0;} 
+
+static int motor_set_speed(const struct device *dev, uint8_t percent){
+   const struct motor_config *cfg = dev->config;
+   uint32_t pulse = cfg->enable.period / 100 * percent;
+   pwm_set_dt(&cfg->enable, cfg->enable.period, pulse);
+   return 0;}
+
+static int motor_init(const struct device *dev){
+    const struct motor_config *cfg = dev->config; 
+    /* todo should init pwm here */
+    gpio_pin_configure_dt(&cfg->phase, GPIO_OUTPUT_INACTIVE);
+    return 0;}
+
+static const struct motor_api motor_api_funcs = {
+  .rotate = motor_rotation,
+  .speed  = motor_set_speed, };
+
+#define MOTOR_DEFINE(inst)                                    \
+  static const struct motor_config motor_config_##inst = {    \
+    .enable = PWM_DT_SPEC_INST_GET_BY_IDX(inst, 0),           \
+    .phase  = GPIO_DT_SPEC_INST_GET_BY_IDX(inst, gpios,0),    \
+    .id     = inst };                                         \
+                                                              \
+  DEVICE_DT_INST_DEFINE(inst, motor_init, NULL, NULL,         \
+                 &motor_config_##inst, POST_KERNEL,           \
+                 CONFIG_PWM_INIT_PRIORITY, &motor_api_funcs); \
+
+DT_INST_FOREACH_STATUS_OKAY(MOTOR_DEFINE)
