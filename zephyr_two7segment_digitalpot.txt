@@ -1,0 +1,37 @@
+/*
+ * demo i2c from electric dollar store
+ *   read digi pot 0 -99
+ *   display to 2 seven segement value read
+ *
+ * board for waveshare rp2350b core
+ * west build -p -b core2350b/rp2350b/m33_0
+ *
+ */
+
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/i2c.h>
+#include <zephyr/sys/printk.h>
+
+#define SEVEN_SEGMENT_ADDRESS 0x16
+#define DIGIPOT_ADDRESS 0x28
+#define DIGIPOT_REGISTER 100
+
+const struct device *i2c_dev = DEVICE_DT_GET(DT_NODELABEL(i2c1));
+
+int main(void){
+uint8_t buf[2] = {0x02,0x02};
+uint8_t read_buf[1];
+int ret;
+printk("starting.../n");
+if(!i2c_dev){printk("i2c not found\n"); return -1;}
+if(!device_is_ready(i2c_dev)){printk("i2c not ready\n"); return -1;}
+
+while(1){
+  ret = i2c_reg_read_byte(i2c_dev, DIGIPOT_ADDRESS, DIGIPOT_REGISTER, read_buf);
+  buf[1] = read_buf[0];
+  ret=i2c_write(i2c_dev,buf,sizeof(buf),SEVEN_SEGMENT_ADDRESS); 
+  k_msleep(100);
+}
+return 0;
+}
