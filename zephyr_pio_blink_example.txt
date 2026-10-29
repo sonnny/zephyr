@@ -1,0 +1,60 @@
+/*
+ * demo blink using rp2040 pio in zephyr
+ *
+ * prj.conf
+ *
+ * CONFIG_GPIO=y
+ * CONFIG_PIO_RPI_PICO=y
+ *
+ * CMakeLists.txt
+ *
+ * cmake_minimum_required(VERSION 3.20.0)
+ * find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+ * project(pio_pulse)
+ * target_sources(app PRIVATE src/main.c)
+ *
+ */
+#include <zephyr/kernel.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/misc/pio_rpi_pico/pio_rpi_pico.h>
+#include <hardware/pio.h>
+#include <hardware/clocks.h>
+
+/* https://docs.zephyrproject.org/latest/doxygen/html/group__pio__rpi__pico__interface.html#ga744449bb6c1a409a9d8677c66667ea9b  */
+RPI_PICO_PIO_DEFINE_PROGRAM(
+    hello_led, // name of program
+    0, // wrap_target
+    2, // wrap
+    // comma separated list of pio instructions
+    0x80a0, /* 0: pull block       ; Stall until data is in TX FIFO */
+    0x6001, /* 1: out pins, 1      ; Shift 1 bit out to the configured pin */
+    0x0000  /* 2: jmp 0            ; Jump back to the start */
+);
+
+#define LED_PIN 4
+
+int main(void){
+  PIO pio = pio0;
+  int sm = pio_claim_unused_sm(pio, true);
+  const struct pio_program *program = RPI_PICO_PIO_GET_PROGRAM(hello_led);
+  uint offset = pio_add_program(pio, program);
+  pio_sm_config config = pio_get_default_sm_config();
+  sm_config_set_wrap(
+    &config,
+    offset + RPI_PICO_PIO_GET_WRAP_TARGET(hello_led),
+    offset + RPI_PICO_PIO_GET_WRAP(hello_led));
+    
+  sm_config_set_clkdiv(&config, 12500000.0f);
+  sm_config_set_out_pins(&config, LED_PIN, 1);
+  pio_gpio_init(pio, LED_PIN);
+  pio_sm_set_consecutive_pindirs(pio, sm, LED_PIN, 1, true);
+  pio_sm_init(pio, sm, offset, &config);
+  pio_sm_set_enabled(pio, sm, true);
+  
+  while(1){
+    pio_sm_put_blocking(pio, sm, 1);
+    k_msleep(500);
+    pio_sm_put_blocking(pio, sm, 0);
+    k_msleep(500);}
+  return 0;}
+
