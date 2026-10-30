@@ -1,0 +1,137 @@
+
+zephyr demo of nmra dcc generator
+using rp2350b pio device
+ 
+motor controller
+   cytron md13s pwm - tied to 3.3v
+     dir - gpio 2
+ 
+  i2c digital pot - electric dollar store
+  i2c two 7 segment led - electric dollar store
+ 
+  convert your pio file --- wokwi.com/tools/pioasm
+  convert _LT with less than symbol
+  convert _GT with greather than symbol
+  youtube description don't like angle brackets
+  all include are enclosed with angle brackets
+ 
+////////// main.c
+#include stdlib.h -- need for abs function
+#include zephyr/kernel.h
+#include zephyr/device.h
+#include zephyr/drivers/i2c.h
+#include "dcc.c"
+
+#define ADDRESS       20
+#define PREAMBLE  0xFFFE
+#define SPEED_128   0x3F
+
+#define SEVEN_SEGMENT_ADDRESS 0x16
+#define DIGIPOT_ADDRESS       0x28
+#define DIGIPOT_REGISTER       200
+
+const struct device *i2c_dev = DEVICE_DT_GET(DT_NODELABEL(i2c1));
+
+uint64_t packet;
+uint8_t bytes[8];
+uint8_t checksum;
+uint8_t speed;
+uint8_t direction = 0;
+uint8_t buf[2] = {0x02, 0x02};
+int ret;
+
+int main(void){
+  pio_init();
+  
+  while(1){
+  
+    ret = i2c_reg_read_byte(i2c_dev, DIGIPOT_ADDRESS, DIGIPOT_REGISTER, &speed);
+    buf[1] = speed;
+    ret = i2c_write(i2c_dev, buf, sizeof(buf), SEVEN_SEGMENT_ADDRESS);
+    
+    if (speed _GT 100) {
+      speed = speed - 100;
+      direction = 1;}
+    else {
+      speed = abs(speed - 100);
+      direction = 0;}
+      
+    if (direction) speed += 0x80;
+    
+    checksum = ADDRESS ^ SPEED_128 ^ speed;
+    packet =  ((uint64_t)PREAMBLE_LT_LT48)
+             |((uint64_t)ADDRESS_LT_LT40)
+             |((uint64_t)SPEED_128_LT_LT31)
+             |((uint64_t)speed_LT_LT22)
+             |((uint64_t)checksum_LT_LT13)
+             |((uint64_t)0x01_LT_LT12);
+
+  for(int i=0; i _LT 8; i++) bytes[i] = (packet _GT_GT (i * 8)) & 0xFF;
+  for(int i=7; i _GT 0; i--) dcc_put8(bytes[i]);
+  k_msleep(30);
+  } return 0;}
+  
+////////// dcc.c
+#include zephyr/kernel.h
+#include zephyr/drivers/gpio.h
+#include zephyr/drivers/misc/pio_rpi_pico/pio_rpi_pico.h
+#include hardware/pio.h
+#include hardware/clocks.h
+
+RPI_PICO_PIO_DEFINE_PROGRAM(
+  dcc_pulse,
+  0,
+  7,
+          //     .wrap_target
+  0xf401, //  0: set    pins, 1                [20]
+  0x6021, //  1: out    x, 1                       
+  0x0025, //  2: jmp    !x, 5                      
+  0xf500, //  3: set    pins, 0                [21]
+  0x0000, //  4: jmp    0                          
+  0xb042, //  5: nop                           [16]
+  0xfe00, //  6: set    pins, 0                [30]
+  0xa842  //  7: nop                           [8] 
+          //     .wrap
+);
+
+#define DCC_PIN 2
+
+PIO pio = pio0;
+int sm;
+
+void pio_init() {
+  sm = pio_claim_unused_sm(pio, true);
+  const struct pio_program *program = RPI_PICO_PIO_GET_PROGRAM(dcc_pulse);
+  uint offset = pio_add_program(pio, program);
+  pio_sm_config config = pio_get_default_sm_config();
+  sm_config_set_wrap(
+    &config,
+    offset + RPI_PICO_PIO_GET_WRAP_TARGET(dcc_pulse),
+    offset + RPI_PICO_PIO_GET_WRAP(dcc_pulse));
+    
+  pio_gpio_init(pio, DCC_PIN);
+  pio_sm_set_consecutive_pindirs(pio, sm, DCC_PIN, 1, true);
+  sm_config_set_set_pins(&config, DCC_PIN, 1);
+  sm_config_set_fifo_join(&config, PIO_FIFO_JOIN_TX);
+  float div = clock_get_hz(clk_sys) / 400000.0;
+  sm_config_set_clkdiv(&config, div);
+  sm_config_set_out_shift(&config, false, true, 8);
+  pio_sm_init(pio, sm, offset, &config);
+  pio_sm_set_enabled(pio, sm, true); }
+  
+void dcc_put8(uint8_t data){
+  io_rw_8 *txfifo = (io_rw_8 *)&pio-_GTtxf[sm];
+  *txfifo = data;}
+
+/////////// CMakeLists.txt
+cmake_minimum_required(VERSION 3.20.0)
+set(OPENOCD /usr/local/bin/openocd)
+set(OPENOCD_DEFAULT_PATH /home/sonny/pico/openocd)
+find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+project(dcc_test)
+target_sources(app PRIVATE src/main.c)
+
+/////////// prj.conf
+CONFIG_GPIO=y
+CONFIG_PIO_RPI_PICO=y
+CONFIG_I2C=y
