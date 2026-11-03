@@ -1,0 +1,21 @@
+
+// https://www.nunonogueira.com/zephyr/intro-gpio-pwm
+#include <stdio.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/kernel.h>
+#include <zephyr/sys/printk.h>
+#include <zephyr/device.h>
+ 
+static const struct device* gpio2 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
+ 
+int main(void){
+	if (!device_is_ready(gpio2)) {
+		printk("Error: gpio2 device is not ready\n");
+		return -1;}
+	gpio_pin_configure(gpio2, 18, GPIO_OUTPUT);
+	while (1) {
+		gpio_pin_set(gpio2, 18, 1);
+		k_msleep(1000);
+		gpio_pin_set(gpio2, 18, 0);
+		k_msleep(1000);}
+	return 0;}
