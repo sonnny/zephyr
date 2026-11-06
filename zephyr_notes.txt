@@ -1,0 +1,232 @@
+
+how to start a basic template
+terminal path $HOME
+
+  1) source ~/zephyrproject/.venv/bin/activate
+  2) west init -m https://github.com/zephyrproject-rtos/example-application --mr main my_own_zephyr_directory_name
+  3) cd my_own_zephyr_directory_name
+  4) edit $HOME/my_own_zephyr_directory_name/example-application/west.yml
+     a) editing west.yml file
+     b) go down to name-allowlist:
+     c) there should only be 2 line
+     d) name-allowlist:
+          - cmsis_6
+          - hal_rpi_pico
+     e) save west.yml
+  5) while still at $HOME/my_own_zephyr_directory_name
+  6) west update
+     a) this will only pull stuff for raspberry pi rp2040 and rp2350
+  7) how to compile
+  8) cd to $HOME/my_own_zephyr_directory_name/example-application
+  9) west build -p -b rp2350b_core/rp2350b/m33_0 app
+       a) this board is for weact rp2350b core
+ 10) west flash (if you configure the CMakeLists.txt for openocd)
+ 11) the location of main.c is:
+       $HOME/my_own_zephyr_directory_name/example-application/app/src/main.c
+
+
+how to build zephyr outside zephyr directory
+
+make sure you have this files
+
+blinky
+  -- src/main.c
+  -- CMakeLists.txt
+  -- prj.conf
+  
+minimum compile:
+  $ source ~/zephyrproject/.venv/bin/activate
+  $ export ZEPHYR_BASE=~/zephyrproject/zephyr
+  $ export ZEPHYR_SDK_INSTALL_DIR=~/zephyr-sdk-1.0.1
+  
+to compile:
+
+  1.  cd ~/blinky
+  2.  source ~/zephyrproject/.venv/bin/activate
+  3.  source ~/zephyrproject/zephyr/zephyr-env.sh
+  4.  west build -b adafruit_metro_rp2040 .
+  5.  or west build -p -b adafruit_metro_rp2040 .
+  5.  west flash (make sure you're in uf2 mode, press boot, press reset release, boot release
+  
+  to compile with overlay
+  
+  west build -p always -b rp2350b_core/rp2350b/m33 . -- -DDTC_OVERLAY_FILE="$(pwd)/rp2350b_core.overlay"
+  
+  another example compile with overlay
+  west build -p always -b rp2350b_core/rp2350b/m33 . -- -DDTC_OVERLAY_FILE=rp2350b_core.overlay
+  
+  
+  -- in west command tells west to pass all subsequent arguments directly to CMake
+  
+  shortcut:
+    set board in app/CMakeLists.txt
+      set(BOARD rp2350b_core/rp2350b/m33)
+      
+    then to compile: west build app (make sure to remove build directory)
+    
+---------------------------------------------------------
+building tips from the internet
+
+assumes your in your project directory
+
+source ~/zephyrproject/.venv/bin/activate
+rm -r build
+west build -b rpi_pico . \
+-- -DDTC_OVERLAY_FILE=/home/username/pico.overlay \
+
+    
+  --------------------------------------------------------
+  error encountered on zephyr example application template
+    rpi_pico dependencies error
+    edit appzep/example-application/west.yml
+      under name-allowlist
+        add - hal_rpi_pico
+        or
+        add - hal_rp2350b_core_rp2350b_m33
+        
+ -------------------------------------------------------
+ no need to add overlay in west command
+   just add it in /boards directory with matching board name with extension .overlay
+   
+----------------------------------------------
+when using i2c, make sure put 10k resistor pull-up to sda and scl
+
+---------------------------------------------------------
+when board is set in cmakelist, to compile just use -> west build app
+after modifying source file no need to build
+  just put board in uf2 mode
+  command -> west flash -r uf2
+  zephyr will re-compile changes and flash picking up the changes you made on the source file
+   
+        
+--------------------------------------------------------------------
+
+error undefined reference to __device_dts_ord_N
+
+Identify the Node: Look up the ordinal number N in <build>/zephyr/include/generated/zephyr/devicetree_generated.h to find the device path. 
+Verify Kconfig: Ensure the driver's Kconfig symbol is enabled in prj.conf (e.g., CONFIG_FOO=y). 
+  
+----------------------------------------------------------
+troubleshooting rpi_pico board with ssd1306
+
+getting error device dts no reference
+double check file got from internet
+this line --> compatible = "solomon,ssd1306fb";
+change to --> compatible = "solomon,ssd1306"; (deleted fb)
+found this by using this option on build
+    -- -DZEPHYR_SCA_VARIANT=dtdoctor
+this option says dts device enabled but no driver available
+so ssd1306fb no driver
+ssd1306 works
+
+i2c trouble again not communicating
+  added 10k pull-up resistor to sda and scl
+    getting some pixel but scrambled
+    
+to see printk on /dev/ttyACM0
+  add to prj.conf
+    CONFIG_PRINTK=y
+    CONFIG_CONSOLE=y
+    CONFIG_STDOUT_CONSOLE=y
+    
+then build
+  west build -p -b rpi_pico -S cdc-acm-console -- -DCONFIG_USB_DEVICE_INITIALIZE_AT_BOOT=y
+  check if /dev/ttyACM0 exists
+  if it does use ./arduino.AppImage --no-sandbox
+  and use arduino serial monitor to view /dev/ttyACM0
+  sometime I have problem with linux tio /dev/ttyACM0
+    but arduino serial monitor works everytime
+
+    
+    getting message 
+      cfb init failed
+    googled failure
+      added to prj.conf
+      CONFIG_HEAP_MEM_POOL_SIZE=16384
+      
+finally sucess, sees hello world on the screen
+
+complete build command
+   west build -p always -S cdc-acm-console -b rpi_pico . -- -DDTC_OVERLAY_FILE=display.overlay -DZEPHYR_SCA_VARIANT=dtdoctor
+   
+
+----------------------------------------
+scanning i2c using shell
+
+build command for rpi_pico2w
+
+  west build -p -S cdc-acm-console -b rpi_pico2/rp2350a/m33/w samples/sensor/sensor_shell -DCONFIG_I2C_SHELL=y -DCONFIG_I2C=y 
+  
+  west flash -r uf2
+  
+  using the shell
+   tio /dev/ttyACM0
+   
+   i2c scan  -- this would show the i2c bus with address
+   
+   i2c scan i2c@40090000  -- scan i2c0
+   
+   send decimal 50 to electric dollar store seven segment display
+       i2c write_byte i2c@40090000 0x14 0x01 50
+       
+----------------------------------------------------------------------
+found on the internet to convert zephyr arduino shield to adapt to our board without shield
+https://github.com/jeronimoagullo/Zephyr-TTF-fonts-for-CFB/blob/main/readme.md
+
+this typical overlay with shield:
+
+&arduino_i2c {
+  status = "okay"
+  ssh1106_sh1106_128x64: ssd1306@3c {
+    compatible = "sinowealth,sh1106";
+    reg = <0x3c>;
+    ...
+    ...
+    
+all we have to do in our overlay is the code below
+remember this is the only file content of our overlay
+the display overlay is taken care of using the SHIELD (see build below)
+
+arduino_i2c: &i2c1 {  ( or &i2c0 depending on where you wired your display )
+  status = "okay";
+};
+
+minimum prj.conf with display
+CONFIG_DISPLAY=y
+# CFB API
+CONFIG_CHARACTER_FRAMEBUFFER=y
+# needed for the k_malloc function used by cfb library
+CONFIG_HEAP_MEM_POOL_SIZE=16384
+
+now to build for pico without arduino i2c shield
+west build -b rpi_pico -- -DSHIELD=ssd1306_128x64
+
+---------------------------------------------------------------------------------
+to build for adafruit feather nrf52840 using uf2
+
+west build -p -b adafruit_feather_nrf52480/nrf52840/uf2 samples/basic/blinky
+west flash
+
+-------------------------------------------------------------------------------
+
+to flash with openocd
+add to CMakeLists.txt
+
+cmake_minimum_required(VERSION 3.13.1)
+
+set(OPENOCD /usr/local/bin/openocd)
+set(OPENOCD_DEFAULT_PATH /home/sonny/pico/openocd)
+
+find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+
+then just issue west flash
+-------------------------------------------------------------------------------
+
+to activate i2c-tiny-usb
+
+sudo modprobe i2c-tiny-usb
+sudo sh -c "echo 0x2fe3 0x0013 > /sys/bus/usb/drivers/i2c-tiny-usb/new-id"
+sudo i2cdetect -l (it should show bus 14 is the new i2c bus)
+
+--------------------------------------------------------------------------------
+
