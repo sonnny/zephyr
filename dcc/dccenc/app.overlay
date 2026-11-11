@@ -1,0 +1,27 @@
+/ {
+    aliases {
+        my-pio = &pio0_my_device;
+    };
+};
+
+&pio0 {
+    status = "okay";
+
+    pio0_my_device: pio0_my_device {
+        /* Assign specific pins for your custom PIO function */
+        pinctrl-0 = <&pio0_my_pins>;
+        pinctrl-names = "default";
+        
+        compatible = "raspberrypi,pico-pio-device";
+        status = "okay";
+    };
+};
+
+&pinctrl {
+    pio0_my_pins: pio0_my_pins {
+        group1 {
+            /* Example: Assign GPIO 10 and 11 to PIO0 */
+            pinmux = <PIO0_P10>, <PIO0_P11>;
+        };
+    };
+};   
