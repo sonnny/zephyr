@@ -1,0 +1,95 @@
+zephyr rtos
+working pio blink
+
+////////////////main .c
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/misc/pio_rpi_pico/pio_rpi_pico.h>
+#include <hardware/pio.h>
+#include <hardware/clocks.h>
+
+#define LED_PIN 13
+
+RPI_PICO_PIO_DEFINE_PROGRAM(blink, 0, 3,
+	0xff01, /* set pins, 1 [31] */
+	0xbf42, /* nop         [31] */
+	0xff00, /* set pins, 0 [31] */
+	0xbf42  /* nop         [31] */
+);
+
+int main(void)
+{
+	size_t sm;
+	PIO pio;
+	uint offset;
+
+	pio = pio0;
+	sm = pio_claim_unused_sm(pio, true);
+
+	/* Load program into PIO instruction memory */
+	const struct pio_program *prog = RPI_PICO_PIO_GET_PROGRAM(blink);
+	if (!pio_can_add_program(pio, prog)) {
+		return -ENOMEM;
+	}
+	offset = pio_add_program(pio, prog);
+
+	/* Configure state machine */
+	pio_sm_config cfg = pio_get_default_sm_config();
+	sm_config_set_wrap(&cfg,
+			   offset + RPI_PICO_PIO_GET_WRAP_TARGET(blink),
+			   offset + RPI_PICO_PIO_GET_WRAP(blink));
+	sm_config_set_set_pins(&cfg, LED_PIN, 1);
+	pio_gpio_init(pio, LED_PIN);
+
+	/* Slow down the PIO clock so the blink is visible (~2 kHz) */
+	float div = (float)clock_get_hz(clk_sys) / 2000.0f;
+	sm_config_set_clkdiv(&cfg, div);
+
+	/* Set pin direction and start the state machine */
+	pio_sm_set_consecutive_pindirs(pio, sm, LED_PIN, 1, true);
+	pio_sm_init(pio, sm, offset, &cfg);
+	pio_sm_set_enabled(pio, sm, true);
+
+	while (1) {
+		k_sleep(K_FOREVER);
+	}
+
+	return 0;
+}
+////////////////prj.con
+CONFIG_GPIO=y
+CONFIG_PIO_RPI_PICO=y
+
+////////////////CMakeLists.txt
+cmake_minimum_required(VERSION 3.13.1)
+
+set(OPENOCD /usr/local/bin/openocd)
+
+set(OPENOCD_DEFAULT_PATH /home/sonny/Projects/openocd)
+
+
+find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+
+project(app LANGUAGES C)
+
+target_sources(app PRIVATE src/main.c)
+////////////////app.overlay
+&pio0 {
+	status = "okay";
+	pio_my_device: pio_my_device {
+	  pinctrl-0 = <&pio0_blink_default>;
+	  pinctrl-names = "default";
+	  /* compatible = "raspberrypi,pico-pio-device"; */
+	  compatible = "raspberrypi,pico-pio-device";
+	  status = "okay";
+	};
+};
+
+
+&pinctrl {
+	pio0_blink_default: pio0_blink_default {
+		group1 {
+			pinmux = <PIO0_P25>;
+		};
+	};
+};
