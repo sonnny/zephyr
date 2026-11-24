@@ -1,0 +1,53 @@
+/* zephyr blink pio rp2040
+ *
+ * app.overlay
+ *
+ * &pio0 {
+ *	status = "okay";
+ *};
+ *
+ * prj.conf
+ *
+ * CONFIG_GPIO=y
+ * CONFIG_PIO_RPI_PICO=y
+ */
+
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/misc/pio_rpi_pico/pio_rpi_pico.h>
+#include <hardware/pio.h>
+#include <hardware/clocks.h>
+
+#define LED_PIN 28
+
+RPI_PICO_PIO_DEFINE_PROGRAM(blink, 0, 3,
+	0xff01, /* set pins, 1 [31] */
+	0xbf42, /* nop         [31] */
+	0xff00, /* set pins, 0 [31] */
+	0xbf42  /* nop         [31] */
+);
+
+int main(void) {
+	size_t sm;
+	PIO pio = pio0;
+	uint offset;
+	sm = pio_claim_unused_sm(pio, true);
+
+	const struct pio_program *prog = RPI_PICO_PIO_GET_PROGRAM(blink);
+	if (!pio_can_add_program(pio, prog)) {
+		return -ENOMEM;}
+	offset = pio_add_program(pio, prog);
+	pio_sm_config cfg = pio_get_default_sm_config();
+	sm_config_set_wrap(&cfg,
+			   offset + RPI_PICO_PIO_GET_WRAP_TARGET(blink),
+			   offset + RPI_PICO_PIO_GET_WRAP(blink));
+	sm_config_set_set_pins(&cfg, LED_PIN, 1);
+	pio_gpio_init(pio, LED_PIN);
+	float div = (float)clock_get_hz(clk_sys) / 2000.0f;
+	sm_config_set_clkdiv(&cfg, div);
+	pio_sm_set_consecutive_pindirs(pio, sm, LED_PIN, 1, true);
+	pio_sm_init(pio, sm, offset, &cfg);
+	pio_sm_set_enabled(pio, sm, true);
+
+	while (1) {k_sleep(K_FOREVER);}
+return 0;}
