@@ -12,11 +12,25 @@ uses:
 adafruit motorized fader https://www.adafruit.com/product/5466
 pololu hbridge https://www.pololu.com/product/2961
 
-#inc math.h
-#inc zephyr/kernel.h
-#inc zephyr/drivers/pwm.h
-#inc zephyr/drivers/gpio.h
-#inc zephyr/drivers/adc.h
+/*
+
+build command:
+:~$ west build -p -b rpi_pico app_adc -S cdc-acm-console
+
+demo for motorized fader using rp2040
+motor voltage 5 volts
+uses:
+  adafruit motorized fader https://www.adafruit.com/product/5466
+  pololu hbridge https://www.pololu.com/product/2961
+
+*/
+
+#include <math.h>
+#include <zephyr/kernel.h>
+#include <zephyr/drivers/pwm.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/adc.h>
+#include <zephyr/sys/printk.h>
 
 #define MOTOR_ENABLE() gpio_pin_set_dt(&enable, 0)
 #define MOTOR_DISABLE() gpio_pin_set_dt(&enable, 1)
@@ -58,7 +72,7 @@ int main(void) {
   /* init adc */
   if (!adc_is_ready_dt(&adc_chan0)) { return -ENODEV;}
   err = adc_channel_setup_dt(&adc_chan0);
-  if (err _LT 0) { return -ENODEV; }
+  if (err < 0) { return -ENODEV; }
   (void)adc_sequence_init_dt(&adc_chan0, &sequence);
 
   /* init pwm, enable, and direction */
@@ -72,22 +86,22 @@ int main(void) {
 
   while(1) {
 
-    if (startup_value _GT HALFWAY) {
+    if (startup_value > HALFWAY) {
       MOTOR_ENABLE();
       MOTOR_DOWN();
       move_slider();
       do {
         slider_value = get_slider_value();
-      } while (slider_value _GT HALFWAY);
+      } while (slider_value > HALFWAY);
       MOTOR_DISABLE();
     }
-    else if (startup_value _LT HALFWAY) {
+    else if (startup_value < HALFWAY) {
       MOTOR_ENABLE();
       MOTOR_UP();
       move_slider();
       do {
         slider_value = get_slider_value();
-      } while (slider_value _LT HALFWAY);
+      } while (slider_value < HALFWAY);
       MOTOR_DISABLE();
     }
     //printk("data: %hhu\n", result);
@@ -100,20 +114,20 @@ int main(void) {
 
 return 0;}
 
-////////////// app.overlay
-
-#include zephyr/dt-bindings/pwm/pwm.h
+/*
+/* app.overlay */
+#include <zephyr/dt-bindings/pwm/pwm.h>
 
 / {
 
   zephyr,user {
-    io-channels = _LT&adc 0_GT; /* gpio26 */
+    io-channels = <&adc 0>; /* gpio26 */
   };
 
   pwm_leds {
     compatible = "pwm-leds";
     pwmch1: pwm_1 {
-      pwms = _LT&pwm 0 PWM_MSEC(20) PWM_POLARITY_NORMAL_GT; /* gpio0 */
+      pwms = <&pwm 0 PWM_MSEC(20) PWM_POLARITY_NORMAL>; /* gpio0 */
       label = "pwm ch1";
     };
   };
@@ -121,11 +135,11 @@ return 0;}
   leds {
     compatible = "gpio-leds";
     enable1: enable_pin {
-      gpios = _LT&gpio0 2 GPIO_ACTIVE_HIGH_GT;
+      gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
       label = "enable pin";
     };
     direction1: direction_pin {
-      gpios = _LT&gpio0 4 GPIO_ACTIVE_HIGH_GT;
+      gpios = <&gpio0 4 GPIO_ACTIVE_HIGH>;
       label = "direction pin";
     };
   };
@@ -139,29 +153,33 @@ return 0;}
 
 &pwm {
   status = "okay";
-  pinctrl-0 = _LT&pwm_default_GT;
+  pinctrl-0 = <&pwm_default>;
   pinctrl-names = "default";
-  divider-int-0 = _LT255_GT;
+  divider-int-0 = <255>;
 };
 
 &pinctrl {
   pwm_default: pwm_default {
     group1 {
-      pinmux = _LTPWM_0A_P0_GT;
+      pinmux = <PWM_0A_P0>;
     };
   };
 };
 
 &adc {
   status = "okay";
-  #address-cells = _LT1_GT;
-  #size-cells = _LT0_GT;
+  #address-cells = <1>;
+  #size-cells = <0>;
 
   channel@0 {
-    reg = _LT0_GT;
+    reg = <0>;
 	zephyr,gain = "ADC_GAIN_1";
 	zephyr,reference = "ADC_REF_INTERNAL";
-	zephyr,acquisition-time = _LTADC_ACQ_TIME_DEFAULT_GT;
-	zephyr,resolution = _LT12_GT;
+	zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+	zephyr,resolution = <12>;
   };
 };
+
+
+*/
+
